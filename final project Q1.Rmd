@@ -1,0 +1,86 @@
+---
+title: "FINAL PROJECT Q1"
+author: "Sixue Cheng"
+date: "12/18/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+library(mice)
+library(tidyverse)
+library(leaps)
+setwd("~/Desktop/math 185/final project")
+Dataset <- read.csv("kread.csv")
+```
+
+```{r}
+sum(is.na(Dataset$R.SCORE))
+datasets =na.omit(Dataset)
+sum(is.na(Dataset$L.SCORE))
+dataset =na.omit(Dataset)
+```
+
+(1)
+```{r}
+inp1 = dataset %>% group_by(INP = 1)
+inp2 = dataset %>% group_by(INP = 0)
+r_inp1 = inp1$R.SCORE
+r_inp2 = inp2$R.SCORE
+l_inp1 = inp1$L.SCORE
+l_inp2 = inp2$L.SCORE
+t.test(r_inp1,r_inp2)
+t.test(l_inp1,l_inp2)
+```
+Since p_value in R_score T-test and L_score T-test of students in these two programs is 1, so there has a significant difference in terms of the reading ability with 2 groups.
+
+(2)
+I use best subset selection:
+```{r}
+bss.full = regsubsets(DIEBLS~ dataset$R.SCORE + dataset$L.SCORE + dataset$FARM, dataset, nvmax = 3)
+bss.summary = summary(bss.full)
+which.min(bss.summary$bic)
+(bss.summary$which)
+```
+So by best subset selection, 2 variables should be included, and the variables should be R-score and L score.
+
+(3) I separate the dataset into a training set and a testing set, and use test error to determine the adequacy of model:
+```{r}
+dt = sort(sample(nrow(dataset), nrow(dataset)*.2))
+test<-dataset[dt,]
+train <- dataset[-dt,]
+fit_train = lm(DIEBLS~R.SCORE + L.SCORE, data = train)
+summary(fit_train)
+D_predict = predict(fit_train, newdata = test)
+test_error= mean((D_predict - test$DIEBLS)^2)
+test_avg = mean(test$DIEBLS)
+tss = sum((test_avg - test$DIEBLS)^2)
+rsq = (tss - test_error) / tss
+rsq
+```
+Since R^2 for using L-score and R-score as predictors is 0.9863, so the model is adequate.
+
+(4) we can use similar case to predict the missing value of the data. And in R there is a package called "Mice", we can use functions in this package to predict the missing values.
+```{r}
+Dataset$R.SCORE=as.factor(Dataset$R.SCORE)
+md.pattern(Dataset)
+Dataset$L.SCORE=as.factor(Dataset$L.SCORE)
+md.pattern(Dataset)
+mice_imputes = mice(Dataset)
+Imputed_data=complete(mice_imputes)
+Imputed_data
+dim(Imputed_data)
+```
+
+(5) We can use variance test on prediction with FARM and prediction without FARM:
+```{r}
+DATA <- mutate(dataset, FARM = (FARM == "N")+0)
+head(DATA)
+fit.w = lm(DIEBLS~ R.SCORE + L.SCORE + FARM, data = DATA)
+predict_w = predict(fit.w, newdata = DATA)
+fit.wo = lm(DIEBLS~ DATA$R.SCORE + DATA$L.SCORE, data = DATA)
+predict_wo = predict(fit.wo, newdata = DATA)
+var.test(predict_w, predict_wo, alternative = "two.sided")
+```
+Since p-value of variance test between prediction with FARM and prediction without FARM is 1, so there is no statistical difference if including FARM as a covariate. So L-score and R-score are already a good model in predicting DIEBLS.

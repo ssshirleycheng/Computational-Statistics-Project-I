@@ -1,0 +1,368 @@
+---
+title: "final project Q2"
+author: "shirley cheng"
+date: "12/1/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+library(MASS)
+library(tidyverse)
+library(leaps)
+library(glmnet)
+data(Boston)
+```
+
+
+
+```{r}
+z = Boston[, 14]
+z[Boston[, 14] <= median(Boston[, 14])] = 1
+z[Boston[, 14] > median(Boston[, 14])] = 2
+parcoord(Boston[, seq(1, 14, 1)], lty = z, lwd = 0.7, col = z, main = "Parallel Coordinates Plot for Boston Housing", frame = TRUE)
+axis(side = 2, at = seq(0, 1, 0.2), labels = seq(0, 1, 0.2)) 
+```
+
+
+```{r}
+data = Boston
+K    = as.numeric(data[, 14] > median(data[, 14])) + 1
+x    = cbind(data[, -(6:13)], K)
+z    = data.frame(x)
+z1   = subset(z, z$K == 1)
+z2   = subset(z, z$K == 2)
+m1   = apply(z1, 2, mean)
+m2   = apply(z2, 2, mean)
+i    = 0
+op   = par(mfrow = c(6, 6), cex = 0.15)
+while (i < 6) {
+  i = i + 1
+  j = 0
+  while (j < 6) {
+    j = j + 1
+    
+    if (i == j) {
+      boxplot(x[, i] ~ K, at = 1:2, axes = FALSE, lwd = 0.7)
+      lines(c(0.6, 1.4), c(m1[i], m1[i]), lty = "dotted", lwd = 1.2, col = "red3")
+      lines(c(1.6, 2.4), c(m1[i], m1[i]), lty = "dotted", lwd = 1.2, col = "red3")
+    }
+    
+    if (i > j) {
+      yy = cbind(x[, j], x[, i], K)
+      plot(yy[, -3], col = as.numeric(K), xlab = "", ylab = "", cex = 4, axes = FALSE)
+    }
+    
+    if (i < j) {
+      plot(i, type = "n", axes = FALSE, xlab = "", ylab = "", main = "")
+    }
+  }
+}
+title(main = list("Scatterplot matrix for Boston Housing", cex = 8), line = -16, 
+      outer = TRUE)
+
+```
+
+(A)
+```{r}
+data = subset(Boston, select = -black)
+x1 = data$crim
+x2 = data$zn
+x3 = data$indus
+x4 = data$chas
+x5 = data$nox
+x6 = data$rm
+x7 = data$age
+x8 = data$dis
+x9 = data$rad
+x10 = data$tax
+x11 = data$ptratio
+x13 = data$lstat
+x14 = data$medv
+```
+
+(1)
+```{r}
+library(ggplot2)
+x1_log = log(x1)
+boxplot(x1,x1_log)
+```
+As we can see, without taking the logarithm, there is many outliers, while after taking the logarithm, there is no outlier.
+```{r}
+plot(x1,x14,main="w/o logarithm",xlab="Per-Capita Crime Rate", ylab="Median value", pch=16)
+plot(x1_log,x14,main="with logarithm",xlab="log Per-Capita Crime Rate", ylab="Median value", pch=16)
+```
+Using the log-transformed variable would help predict the median price better because after log-transforming, the linear relationship is more manifest: housing price decreases as per capita crime rate increases. 
+
+(2)
+```{r}
+hist(x2)
+plot(x2, x1,main = "X1 and X2", xlab="X2", ylab="X1")
+fit2 <- lm(crim~zn, data)
+plot(x2, x14,main = "X2 and X14", xlab="X2", ylab="X14")
+```
+It is more frequent that houses with 0-10 Proportion of residential land zoned for large lots. From the graph, there is no strong relationship between X1 and X2, also there is no clear relation between X2 and X14. 
+
+(3)
+```{r}
+fit3 <- lm(medv~indus, data)
+plot(x3, x14,main = "X3 and X14", xlab="X3", ylab="X14")
+summary(fit3)
+cor(x3,x14)
+```
+Since p-value is less than 0.05 for this model, it is small enough to illustrate that this variable is important, which means it is reasonable to use X3 as an explanatory variable for the prediction of X14. Also, correlation between x3 and x14 is -0.48, which indicates that one unit increases in x3 will result in 0.48 unit decreases with x14.
+
+(4)
+```{r}
+ct = table(x4)
+ct[names(ct)==1]
+plot(x4,x14, xlab = "bounds river", ylab = "Median value")
+```
+Many house far from river have higher price, and many house bounds river have low median price, which means there is no clear relation between “proximity to the river” and “house price”.
+
+```{r}
+fit5 <- lm(medv~nox, data)
+plot(x5, x14,main = "X5 and X14", xlab="Nitric Oxides Concentration", ylab="Median Value")
+summary(fit5)
+```
+there is a relationship between X5 and X14 because house price drops as Nitric Oxides Concentration increasing. It is a negative association.
+
+```{r}
+fit6 <- lm(medv~rm, data)
+plot(x6, x14,main = "X6 and X14", xlab="Average Number of Rooms per Dwelling", ylab="Median Value")
+summary(fit6)
+cor_test = cor.test(Boston$medv, Boston$rm, method="pearson")
+cor_test$estimate
+```
+From the plot and correlation test, we can conclude that there a strong correlation between X6 and X14.
+
+```{r}
+sum(x6 > 7)
+sum(x6 > 8)
+split <- split.data.frame(data, data$rm > 8)
+above8 = split[["TRUE"]]
+mu_above = mean(above8$medv)
+mu = mean(data$medv)
+mu_above
+mu
+```
+So mean of house price with average more than eight rooms per dwelling is 44.2, which is higher than mean of all house price, 22.53. That implies more rooms can result in higher house price.
+
+(7)
+```{r}
+plot(x7, x14,main = "X7 and X14", xlab="Built Prior to 1940", ylab="Median Value")
+cor_test_7 = cor.test(Boston$medv, Boston$age, method="pearson")
+cor_test_7$estimate
+```
+there is connection between X7 and X14, but not clear and visible. It is a negative connection. My explanation could be that the increasing of age of the house will cause decreasing of house value.
+
+(8)
+```{r}
+fit8 = lm(medv~dis, data)
+plot(x8, x14,main = "X8 and X14", xlab="Distance", ylab="Median Value")
+summary(fit8)
+```
+Based on the graph we make, the data does not support the claim that there is a negative relation between the distances to the employment centers and house prices.
+
+(9)
+```{r}
+plot(x9, x14,main = "X9 and X14", xlab="Index of Accessibility to Radial Highways", ylab="Median Value")
+df <- data[order(data$medv),] 
+med <- median(data$medv) 
+lower <- df[1:round(nrow(df)/2),] 
+upper <- df[round((nrow(df)/2)+1):nrow(df),]
+```
+
+```{r}
+mu1 = mean(data$rad)
+split1 <- split.data.frame(data, data$rad > mu1)
+group1 = split1[["FALSE"]]
+group2 = split1[["TRUE"]]
+ttest1 = t.test(group1$medv,lower$medv, alternative = "two.sided")
+ttest2 = t.test(group2$medv,upper$medv, alternative = "two.sided")
+ttest1$p.value
+ttest2$p.value
+```
+
+```{r}
+boxplot(group1$medv,lower$medv)
+boxplot(group2$medv,upper$medv)
+```
+
+
+Since P-value of these two group T-test is less than 0.05, so we reject null hypothesis that  the mean of median price are equal in these groups. Also the box plot of these 2 groups shows that two groups are totally different. We can conclude that two sub-groups does not corresponding to cheaper and more expensive houses.
+
+
+(10)
+```{r}
+split2 <- split.data.frame(data, data$tax > 600)
+group3 = split2[["FALSE"]]
+group4 = split2[["TRUE"]]
+ttest3 = t.test(group3,lower, alternative = "two.sided")
+ttest4 = t.test(group4,upper, alternative = "two.sided")
+ttest3$p.value
+ttest4$p.value
+```
+
+```{r}
+boxplot(group3$medv,lower$medv)
+boxplot(group4$medv,upper$medv)
+```
+
+Same result as X9, We can conclude that two sub-groups does not corresponding to cheaper and more expensive houses.
+
+(11)
+```{r}
+median(data$ptratio)
+plot(x11, x14,main = "X11 and X14", xlab="Pupil/Teacher Ratio", ylab="Median Value")
+```
+By interpreting data, we can see that lower P/T ratio corresponding to higher median price, and as the P/T ratio increases, the median house price increase accordingly. So there a visible relation between X11 and X14.
+
+(12)
+```{r}
+plot(x13, x14,main = "Regular", xlab=" Lower Status", ylab="Median Value")
+new_x13 = sqrt(x13)
+new_x14 = log(x14)
+plot(new_x13,new_x14,main = "Transformed", xlab=" Lower Status ", ylab="Median Value")
+```
+there a visible linear association between X13 and X14 in both transformed graph and regular graph.
+
+(B) Transformation:
+```{r}
+X1 = log(data$crim)
+X2 = 0.1*(data$zn)
+X3 = log(data$indus)
+X4 = data$chas
+X5 = log(data$nox)
+X6 = log(data$rm)
+X7 = (1/10000)*(data$age)^2.5
+X8 = log(data$dis)
+X9 = log(data$rad)
+X10 = log(data$tax)
+X11 = (1/1000)*exp(0.4* (data$ptratio))
+X13 = sqrt(data$lstat)
+X14 = log(data$medv)
+dataset = data.frame(X1,X2,X3,X4,X5,X6,X7,X8,X9,X10,X11,X13,X14)
+```
+
+(C):
+(a)
+```{r}
+multi.fit = lm(X1~., data = dataset)
+summary(multi.fit)
+```
+From summary of linear regression, we can see X2, X8 and X14 have a negative relationship with respect to X1. And the R^2 is 0.87, which means the linear regression has a good fit on data. X2,X3,X4,X6,X11 and X13 is the covariates that we can reject null hypothesis Since these covariates' p-value is less than significant level 0.05.
+
+(b)
+```{r}
+dt = sort(sample(nrow(dataset), nrow(dataset)*.3))
+test<-dataset[dt,]
+train <- dataset[-dt,]
+x.tr = subset(train, select = c(-X1))
+x.train = as.matrix(x.tr)
+y.train = train$X1
+x.te = subset(test, select = c(-X1))
+x.test = as.matrix(x.te)
+y.test = test$X1
+```
+
+Best subset selection: 
+```{r}
+best.full = regsubsets(X1~., dataset, nvmax = 12)
+best.summary = summary(best.full)
+which.min(best.summary$bic)
+best.summary$which
+```
+For best subset selection with BIC criterion, we can see min(BIC) happens when 6 variables is chosen, and that 6 variables are X3, X5, X7, X9, X10, X14.
+
+```{r}
+set.seed(1)
+fit_best <- lm(X1~ X3+X5+X7+X9+X10+X14, data = train)
+y_predict <- predict(fit_best, newdata = test)
+y_test <- test$X1
+test_err_best <-  mean((y_test - y_predict)^2)
+train_predict <- predict(fit_best, newdata = train)
+train_err_best <-  mean((train$X1 - train_predict)^2)
+test_avg <- mean(test$X1)
+best_r2 <- sum((y_predict - mean(test$X1))^2)/sum((test$X1 - mean(test$X1))^2)
+train_err_best
+test_err_best
+best_r2
+```
+The test error for best subset selection is 0.5867, the train error for best subset selection is 0.5867, and R^2 for best subset selection is 0.8358321, which means best subset selection model is not overfitting and has high prediction accuracy.
+
+Ridge regression:
+```{r}
+grid = 10^seq(2, -5, length = 100)
+set.seed(1)
+ridge.mod <- glmnet(x.train,y.train,alpha = 0, lambda = grid)
+cv.out.ridge <- cv.glmnet(x.train, y.train, alpha =0, lambda = grid)
+bestlam_ridge <- cv.out.ridge$lambda.min
+bestlam_ridge
+ridge.pred <- predict(ridge.mod, s= bestlam_ridge,newx = x.test)
+ridge_test_error = mean((ridge.pred - y.test)^2)
+ridge_r2 <- sum((ridge.pred - mean(test$X1))^2)/sum((test$X1 - mean(test$X1))^2)
+ridge_test_error
+ridge_r2 
+```
+
+```{r}
+tr_fb_no_response = model.matrix(X1~., data=train)
+k = 10
+folds = sample(1:k, dim(train)[1], replace=TRUE)
+cv_ridge_errors=matrix(NA, k, 100, dimnames=list(NULL, paste(1:100))) # row fold; column lambda
+for(j in 1:k){ # j is fold
+  ridge.mod = glmnet(x.train[folds!=j,], y.train[folds!=j], alpha=0, lambda=grid)
+  for(i in 1:100){ # i is lambda
+    cv_ridge_errors[j,i] = mean(( y.train[folds==j] - as.matrix(tr_fb_no_response[folds==j,]) %*% as.numeric(coef(ridge.mod)[,i]) )^2 )
+  }
+}
+mean_cv_ridge_errors=apply(cv_ridge_errors,2,mean) # two is for columns
+min(mean_cv_ridge_errors)
+```
+The test error for ridge regression model is 0.7118694, and R^2 is 0.831, which means ridge regression model has high prediction accuracy. And the cross validation error for ridge regression model is 0.615. So Ridge regression model is can be an adequate regression method for this data.
+
+The coefficients for each variables in ridge model:
+```{r}
+predict(ridge.mod, type = "coefficients", s= bestlam_ridge)[1:13,]
+```
+
+(c)
+```{r}
+lasso.mod <- glmnet(x.train,y.train,alpha = 1, lambda = grid)
+cv.out <- cv.glmnet(x.train, y.train, alpha =1, lambda = grid)
+bestlam <- cv.out$lambda.min
+bestlam
+lasso.pred <- predict(lasso.mod, s= bestlam,newx = x.test)
+lasso_test_error = mean((lasso.pred - y.test)^2)
+lasso_r2 <- sum((lasso.pred - mean(test$X1))^2)/sum((test$X1 - mean(test$X1))^2)
+lasso_test_error
+lasso_r2 
+```
+
+```{r}
+tr_s_fb_no_response = model.matrix(X1~., data=train)
+grid = 10^seq(2, -5, length = 100) # possible lambda values to consider
+k = 10
+folds = sample(1:k, dim(train)[1], replace=TRUE)
+cv_lasso_errors=matrix(NA, k, 100, dimnames=list(NULL, paste(1:100))) # row fold; column lambda
+for(j in 1:k){ # j is fold
+  lasso.mod = glmnet(x.train[folds!=j,], y.train[folds!=j], alpha=1, lambda=grid)
+  for(i in 1:100){ # i is lambda
+    cv_lasso_errors[j,i] = mean(( y.train[folds==j] - as.matrix(tr_s_fb_no_response[folds==j,]) %*% as.numeric(coef(lasso.mod)[,i]) )^2 )
+  }
+}
+mean_cv_lasso_errors=apply(cv_lasso_errors,2,mean) # two is for columns
+min(mean_cv_lasso_errors)
+```
+The test error for cross validation lasso model is 0.7099534, the cross validation error is 0.604895.
+
+(d)The coefficients for each variables in lasso model:
+```{r}
+predict(lasso.mod, type = "coefficients", s= bestlam)[1:13,]
+```
+
+(d)I did choose model involve all of the features in the data set. Because a little change in terms of covariates can affect the prediction, so I don't want eliminate any variables. To avoid over-fitting, we can penalize the coefficients of each variable by lasso model or ridge regression. In this case, we can make sure we take all variables into consideration. But based on the coefficients from cross validation ridge regression and cross validation lasso regression I used, X4, X6 and X11 are 3 variables that almost have no relationship with our response variables.
+
+
